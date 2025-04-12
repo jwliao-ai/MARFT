@@ -1,0 +1,19 @@
+absl_py
+cloudpickle
+fairscale
+faiss_gpu
+json_repair
+peft
+pydantic
+pydantic_core
+PyYAML
+sentence_transformers
+sentencepiece
+setproctitle
+tensorboard
+tensorboardX
+torch # some version
+torchvision # some version
+torchaudio # some version
+numpy==1.26.3
+xformers==0.0.27
