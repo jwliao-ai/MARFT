@@ -3,7 +3,7 @@
 
 MARFT stands for **Multi-Agent Reinforcement Fine-Tuning**. This repository implements an LLM-based multi-agent reinforcement fine-tuning framework for general agentic tasks, providing a foundational MARFT framework.
 
-**Check out our paper [MARFT: Multi-Agent Reinforcement Fine-Tuning](https://jwliao-ai.github.io/files/MARFT_0422_v1.pdf)!!!**
+**Check out our paper [MARFT: Multi-Agent Reinforcement Fine-Tuning](https://arxiv.org/abs/2504.16129)!!!**
 
 ## Table of Contents
 - [About](#about)
