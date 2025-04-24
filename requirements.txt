@@ -5,15 +5,13 @@ faiss_gpu
 json_repair
 peft
 pydantic
-pydantic_core
-PyYAML
 sentence_transformers
 sentencepiece
 setproctitle
 tensorboard
 tensorboardX
-torch # some version
+torch # some version, i used 2.4.0+cu121. the below two as well.
 torchvision # some version
 torchaudio # some version
 numpy==1.26.3
-xformers==0.0.27
+xformers==0.0.27.post2
