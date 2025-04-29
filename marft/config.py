@@ -9,7 +9,7 @@ def get_config():
 
     Prepare parameters:
         --algorithm_name <algorithm_name>
-            specifiy the algorithm, including `["rmappo", "mappo", "rmappg", "mappg", "trpo"]`
+            specifiy the algorithm, including `["APPO", "TPPO"]`
         --experiment_name <str>
             an identifier to distinguish different experiment.
         --seed <int>
@@ -28,52 +28,26 @@ def get_config():
             number of parallel envs for rendering, could only be set as 1 for some environments.
         --num_env_steps <int>
             number of env steps to train (default: 10e6)
-        --user_name <str>
-            [for wandb usage], to specify user's name for simply collecting training data.
-        --use_wandb
-            [for wandb usage], by default True, will log date to wandb server. or else will use tensorboard to log data.
 
     Env parameters:
         --env_name <str>
             specify the name of environment
-        --use_obs_instead_of_state
-            [only for some env] by default False, will use global state; or else will use concatenated local obs.
+        --dataset_name <str>
+            specify the name of dataset
+        --dataset_path <str>
+            specify the path of dataset
+        --flag <str>
+            specify the flag of dataset, including `["train", "test"]`
 
     Replay Buffer parameters:
         --episode_length <int>
             the max length of episode in the buffer.
 
     Network parameters:
-        --share_policy
-            by default True, all agents will share the same network; set to make training agents use different policies.
-        --use_centralized_V
-            by default True, use centralized training mode; or else will decentralized training mode.
-        --stacked_frames <int>
-            Number of input frames which should be stack together.
         --hidden_size <int>
             Dimension of hidden layers for actor/critic networks
-        --layer_N <int>
-            Number of layers for actor/critic networks
-        --use_ReLU
-            by default True, will use ReLU. or else will use Tanh.
-        --use_popart
-            by default True, use PopArt to normalize rewards.
-        --use_valuenorm
-            by default True, use running mean and std to normalize rewards.
-        --use_feature_normalization
-            by default True, apply layernorm to normalize inputs.
         --use_orthogonal
             by default True, use Orthogonal initialization for weights and 0 initialization for biases. or else, will use xavier uniform inilialization.
-        --gain
-            by default 0.01, use the gain # of last action layer
-        --use_naive_recurrent_policy
-            by default False, use the whole trajectory to calculate hidden states.
-        --use_recurrent_policy
-            by default, use Recurrent Policy. If set, do not use.
-        --recurrent_N <int>
-            The number of recurrent layers ( default 1).
-        --data_chunk_length <int>
-            Time length of chunks used to train a recurrent_policy, default 10.
 
     Optimizer parameters:
         --lr <float>
@@ -114,12 +88,6 @@ def get_config():
             by default True, whether to mask useless data in value loss.
         --huber_delta <float>
             coefficient of huber loss.
-
-    PPG parameters:
-        --aux_epoch <int>
-            number of auxiliary epochs. (default: 4)
-        --clone_coef <float>
-            clone term coefficient (default: 0.01)
 
     Run parameters：
         --use_linear_lr_decay
@@ -169,10 +137,6 @@ def get_config():
     parser.add_argument("--num_env_steps", type=int, default=10e6, help="Number of environment steps to train (default: 10e6).")
     parser.add_argument("--horizon", type=int, default=3, help="The horizon of the rollout.")
 
-    # wandb setup
-    parser.add_argument( "--user_name", type=str, default="xxx", help="[for wandb usage], to specify user's name for simply collecting training data.")
-    parser.add_argument("--use_wandb", action="store_false", default=False, help="[for wandb usage], by default True, will log date to wandb server. or else will use tensorboard to log data.")
-
     # env parameters
     parser.add_argument("--env_name", type=str, default="MATH", help="Which env to run on")
     parser.add_argument("--dataset_name", type=str, default="xlam", help="Which dataset to test on")
@@ -191,24 +155,9 @@ def get_config():
     parser.add_argument("--episode_length", type=int, default=200, help="Max length for any episode")
 
     # network parameters
-    parser.add_argument("--share_policy", action="store_false", default=True, help="Whether agent share the same policy")
-    parser.add_argument("--use_centralized_V", action="store_false", default=True, help="Whether to use centralized V function")
-    parser.add_argument("--stacked_frames", type=int, default=1, help="Dimension of hidden layers for actor/critic networks")
-    parser.add_argument("--use_stacked_frames", action="store_true", default=False, help="Whether to use stacked_frames")
+    parser.add_argument("--warmup_steps", type=int, default=0, help="number of warmup steps for the critic")
     parser.add_argument("--hidden_size", type=int, default=64, help="Dimension of hidden layers for actor/critic networks")
-    parser.add_argument("--layer_N", type=int, default=2, help="Number of layers for actor/critic networks")
-    parser.add_argument("--use_ReLU", action="store_false", default=True, help="Whether to use ReLU")
-    parser.add_argument("--use_popart", action="store_true", default=False, help="by default False, use PopArt to normalize rewards.")
-    parser.add_argument("--use_valuenorm", action="store_false", default=True, help="by default True, use running mean and std to normalize rewards.")
-    parser.add_argument("--use_feature_normalization", action="store_false", default=True, help="Whether to apply layernorm to the inputs")
     parser.add_argument("--use_orthogonal", action="store_false", default=True, help="Whether to use Orthogonal initialization for weights and 0 initialization for biases")
-    parser.add_argument("--gain", type=float, default=0.01, help="The gain # of last action layer")
-
-    # recurrent parameters
-    parser.add_argument("--use_naive_recurrent_policy", action="store_true", default=False, help="Whether to use a naive recurrent policy")
-    parser.add_argument("--use_recurrent_policy", action="store_true", default=False, help="use a recurrent policy")
-    parser.add_argument("--recurrent_N", type=int, default=1, help="The number of recurrent layers.")
-    parser.add_argument("--data_chunk_length", type=int, default=10, help="Time length of chunks used to train a recurrent_policy")
 
     # optimizer parameters
     parser.add_argument("--lr", type=float, default=5e-7, help="learning rate (default: 5e-7)")

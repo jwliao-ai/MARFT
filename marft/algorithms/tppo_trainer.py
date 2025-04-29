@@ -13,6 +13,7 @@ class TPPOTrainer(ABC):
     def __init__(self, args, mas: MAS):
         self.mas = mas
         self.num_agent = mas.num_agents
+        self.warmup_steps = args.warmup_steps
         self.agent_iteration_interval = args.agent_iteration_interval
         self.clip_param = args.clip_param
         self.ppo_epoch = args.ppo_epoch
@@ -123,6 +124,9 @@ class TPPOTrainer(ABC):
         self.critic_optimizer.step()
         critic_grad_norm = critic_grad_norm.item()
 
+        if global_steps < self.warmup_steps:
+            return value_loss, critic_grad_norm, 0, 0, 0, 0
+        
         # policy update
         # torch.cuda.empty_cache()
         for optimizer in self.policy_optimizer.values(): optimizer.zero_grad()
@@ -153,7 +157,7 @@ class TPPOTrainer(ABC):
             cp_policy_loss.backward()
             policy_loss += cp_policy_loss.item()
             # torch.cuda.empty_cache()
-        if total_approx_kl > 0.02:
+        if total_approx_kl > 1.7e-6: # adjust to the real situation
             return value_loss, critic_grad_norm, 0, 0, total_approx_kl, total_entropy
         
         if agent_to_train is not None:
