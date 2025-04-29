@@ -119,8 +119,8 @@ class MAS(ABC):
         else:
             raise NotImplementedError
         if critic_path is not None:
-            critic_path = os.path.join(critic_path, "critic.pth")
-            critic.load_state_dict(torch.load(critic_path, map_location="cpu"))
+            critic_path = os.path.join(critic_path, "value_head.pth")
+            critic.load_value_head(critic_path, map_location="cpu")
             print(f"Load critic from {critic_path}")
         return critic
 
@@ -444,11 +444,11 @@ class MAS(ABC):
         return next_values
 
     def save(self, save_dir: str, steps: int) -> None:
-        print("save model")
         exp_path = os.path.join(save_dir, "steps_{:04d}".format(steps))
         os.makedirs(exp_path, exist_ok=True)
         self.agents.save_pretrained(exp_path)
-        torch.save(self.critic.state_dict(), os.path.join(exp_path, "critic.pth"))
+        self.critic.save_value_head(os.path.join(exp_path, f"value_head.pth"))
+        print("Save checkpoint to {}".format(exp_path))
 
     def train(self):
         self.agents.train()
