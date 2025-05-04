@@ -15,6 +15,7 @@ MARFT stands for **Multi-Agent Reinforcement Fine-Tuning**. This repository impl
 - [Resume Training](#resume-training)
 - [Contributing](#contributing)
 - [License](#license)
+- [Citation](#citation)
 
 ## About
 This repository aims to help researchers in academia and industry transition into the world of reinforcement learning. The power of multi-agent systems is vast and often surprising, which is why we provide a comprehensive framework for **MARFT**. The framework supports both **action-level optimization** and **token-level optimization**. It is designed to scale to various agentic tasks by allowing users to craft new environments tailored to their specific needs.
@@ -99,3 +100,18 @@ We welcome contributions to improve the framework. To contribute:
 
 ## License
 This project is licensed under the MIT License. For more details, see the [LICENSE](https://github.com/jwliao-ai/MARFT/blob/main/LICENSE) file.
+
+## Citation
+If you find this repository helpful, please consider citing our paper:
+
+```bibtex
+@misc{liao2025marftmultiagentreinforcementfinetuning,
+      title={MARFT: Multi-Agent Reinforcement Fine-Tuning}, 
+      author={Junwei Liao and Muning Wen and Jun Wang and Weinan Zhang},
+      year={2025},
+      eprint={2504.16129},
+      archivePrefix={arXiv},
+      primaryClass={cs.MA},
+      url={https://arxiv.org/abs/2504.16129}, 
+}
+```
