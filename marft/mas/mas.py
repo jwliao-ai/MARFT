@@ -448,7 +448,7 @@ class MAS(ABC):
         os.makedirs(exp_path, exist_ok=True)
         self.agents.save_pretrained(exp_path)
         self.critic.save_value_head(os.path.join(exp_path, f"value_head.pth"))
-        print("Save checkpoint to {}".format(exp_path))
+        print(f"[MAS] MAS checkpoints saved → {exp_path}")
 
     def train(self):
         self.agents.train()

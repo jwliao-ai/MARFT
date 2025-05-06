@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from abc import ABC
 import torch
@@ -35,8 +36,10 @@ class TPPOTrainer(ABC):
             self.mas.agents.set_adapter(self.mas.profiles[agent_idx]["role"])
             self.policy_optimizer[self.mas.profiles[agent_idx]["role"]] = torch.optim.AdamW(filter(lambda p: p.requires_grad, self.mas.agents.parameters()), lr=self.lr, eps=1e-5, weight_decay=0)
         self.critic_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.mas.critic.parameters()), lr=self.critic_lr, eps=1e-5)
-
-
+        
+        if args.load_path is not None:
+            self.load_optimizers(os.path.join(args.load_path, "optimizers.pt"), map_location="cpu")
+            
     def cal_token_mask(self, action_tokens_batch):
         pad_token = self.mas.tokenizer.pad_token_id
         token_mask = (action_tokens_batch != pad_token).int()
@@ -209,6 +212,29 @@ class TPPOTrainer(ABC):
             train_info[k] /= update_time
 
         return train_info
+    
+    def save_optimizers(self, save_dir: str, steps: int) -> None:
+        exp_path = os.path.join(save_dir, "steps_{:04d}".format(steps))
+        os.makedirs(exp_path, exist_ok=True)
+        torch.save(
+            {
+                "policy_opt_states": {
+                    role: opt.state_dict()
+                    for role, opt in self.policy_optimizer.items()
+                },
+                "critic_opt_state": self.critic_optimizer.state_dict(),
+            },
+            os.path.join(exp_path, f"optimizers.pt"),
+        )
+        print(f"[TPPOTrainer] optimizer states saved → {exp_path}")
+
+    def load_optimizers(self, path: str, map_location: str | torch.device = "cpu"):
+        ckpt = torch.load(path, map_location=map_location)
+        for role, opt_state in ckpt["policy_opt_states"].items():
+            # The trainer’s __init__ already created the corresponding optimizer.
+            self.policy_optimizer[role].load_state_dict(opt_state)
+        self.critic_optimizer.load_state_dict(ckpt["critic_opt_state"])
+        print(f"[TPPOTrainer] optimizer states loaded ← {path}")
 
     def prep_training(self):
         self.mas.train()

@@ -160,6 +160,7 @@ class MathRunner:
     def save(self, steps):
         """Save the MAS policies and critic networks."""
         self.mas.save(self.save_dir, steps)
+        self.trainer.save_optimizers(self.save_dir, steps)
 
     def restore(self, model_dir):
         """Restore policy's networks from a saved model."""
