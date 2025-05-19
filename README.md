@@ -1,5 +1,5 @@
 # MARFT: Multi-Agent Reinforcement Fine-Tuning
-[![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/sjtu-marl/malib/blob/main/LICENSE)
+[![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/jwliao-ai/MARFT/blob/main/LICENSE)
 
 MARFT stands for **Multi-Agent Reinforcement Fine-Tuning**. This repository implements an LLM-based multi-agent reinforcement fine-tuning framework for general agentic tasks, providing a foundational MARFT framework.
 
