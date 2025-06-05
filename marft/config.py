@@ -150,6 +150,8 @@ def get_config():
     parser.add_argument("--n_agents", type=int, default=1)
     parser.add_argument("--profile_path", type=str, default="agent_profiles.json", required=True)
     parser.add_argument("--context_window", type=int, default=2048, help="the context window of the actor when acting")
+    parser.add_argument("--use_vllm", action="store_true", default=False, help="use vLLM for inference")
+    parser.add_argument("--multi_gpu", action="store_true", default=False, help="enable multi-GPU training and inference")
 
     # replay buffer parameters
     parser.add_argument("--episode_length", type=int, default=200, help="Max length for any episode")

@@ -23,14 +23,16 @@ class MathRunner:
         self.eval_envs = config["eval_envs"]
 
         self.mas = MAS(
-            model_path=self.all_args.model_name_or_path, 
+            model_path=self.all_args.model_name_or_path,
             context_window=self.all_args.context_window,
-            max_new_tokens=self.all_args.max_new_tokens, 
+            max_new_tokens=self.all_args.max_new_tokens,
             num_agents=self.num_agents,
             profile_path=self.all_args.profile_path,
             algo=self.algo,
             normalization_mode=self.all_args.normalization_mode,
             load_path=self.all_args.load_path,
+            use_vllm=getattr(self.all_args, "use_vllm", False),
+            multi_gpu=getattr(self.all_args, "multi_gpu", False),
         )
 
         if self.algo == "APPO":
@@ -63,11 +65,12 @@ class MathRunner:
             total_num_steps = (episode + 1) * self.episode_length * self.n_rollout_threads
             for step in range(self.episode_length):
                 torch.cuda.empty_cache()
-                rollout_obs, actions, action_tokens, values, log_probs = self.mas.infer_for_rollout(self.buffer.obs[self.buffer.cur_batch_index, step])
+                rollout_obs, actions, action_tokens = self.mas.collect_actions(
+                    self.buffer.obs[self.buffer.cur_batch_index, step]
+                )
                 next_obs, rewards, dones, infos = self.envs.step(actions)
 
-                # insert data into buffer
-                data = next_obs, rollout_obs, rewards, dones, values, actions, action_tokens, log_probs
+                data = next_obs, rollout_obs, rewards, dones, actions, action_tokens
                 self.insert(data)
 
                 for i in range(self.n_rollout_threads):
@@ -102,15 +105,24 @@ class MathRunner:
                 self.eval(total_num_steps)
 
     def insert(self, data):
-        next_obs, rollout_obs, rewards, dones, values, actions, action_tokens, log_probs = data
+        next_obs, rollout_obs, rewards, dones, actions, action_tokens = data
         dones_env = np.all(dones, axis=1)
         masks = np.ones((self.n_rollout_threads, self.num_agents), dtype=np.float32)
         masks[dones_env == True] = np.zeros(((dones_env == True).sum(), self.num_agents), dtype=np.float32)
-        self.buffer.insert(next_obs, actions, rollout_obs, values, rewards, masks, action_tokens, log_probs)
+        self.buffer.insert(next_obs, actions, rollout_obs, rewards, masks, action_tokens)
 
     @torch.no_grad()
     def before_update(self):
         """Calculate returns for the collected data."""
+        for step in range(self.episode_length):
+            obs = self.buffer.rollout_obs[self.buffer.cur_batch_index, step]
+            action_tokens = torch.tensor(
+                self.buffer.action_tokens[self.buffer.cur_batch_index, step],
+                device=self.mas.device,
+            )
+            values, log_probs = self.mas.compute_training_signals(obs, action_tokens)
+            self.buffer.update_step(step, values, log_probs)
+
         values = self.mas.get_next_values(self.buffer.obs[self.buffer.cur_batch_index, -1])
         self.buffer.compute_gae_and_returns(values)
 
@@ -125,7 +137,7 @@ class MathRunner:
 
         eval_obs = self.eval_envs.reset()
         while True:
-            eval_actions, _ = self.mas.get_actions(np.concatenate(eval_obs))
+            _, eval_actions, _ = self.mas.collect_actions(np.concatenate(eval_obs))
             eval_actions = np.array(np.split(eval_actions, self.n_eval_rollout_threads))
             eval_obs, eval_rewards, eval_dones, eval_infos = self.eval_envs.step(eval_actions)
 

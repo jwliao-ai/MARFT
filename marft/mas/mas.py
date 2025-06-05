@@ -1,4 +1,5 @@
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+from marft.inference.inference_engine import InferenceEngine
 import torch
 import os
 import json
@@ -32,6 +33,8 @@ class MAS(ABC):
             load_in_4bit: bool = False,
             bf16: bool = True,
             device_map = None,
+            use_vllm: bool = False,
+            multi_gpu: bool = False,
             **kwargs,
         ):
         self.device = "cuda:0"
@@ -67,9 +70,23 @@ class MAS(ABC):
         self.context_window = context_window
         self.max_new_tokens = max_new_tokens
         self.profiles = load_profiles(profile_path)
+        self.use_vllm = use_vllm
+        self.multi_gpu = multi_gpu
+
+        # inference engine for trajectory collection
+        tensor_parallel = torch.cuda.device_count() if multi_gpu else 1
+        self.inference_engine = InferenceEngine(model_path, max_new_tokens, use_vllm=use_vllm, tensor_parallel_size=tensor_parallel)
 
         self.agents = self._init_agents(load_path).to(self.device)
+        if self.multi_gpu and torch.cuda.device_count() > 1:
+            self.agents = torch.nn.DataParallel(self.agents)
         self.critic = self._init_critic(load_path).to(self.device)
+        if self.multi_gpu and torch.cuda.device_count() > 1:
+            self.critic = torch.nn.DataParallel(self.critic)
+
+    @property
+    def agent_model(self):
+        return self.agents.module if isinstance(self.agents, torch.nn.DataParallel) else self.agents
 
     def _init_agents(self, lora_path=None):
         self.base_model.enable_input_require_grads()
@@ -150,19 +167,28 @@ class MAS(ABC):
             token_seq = self.tokenizer(prompts_with_profile, return_tensors="pt", padding=True)
             input_ids = token_seq["input_ids"].cuda()
             attn_mask = token_seq["attention_mask"].cuda()
-            self.agents.set_adapter(self.profiles[agent_idx]["role"])
-            output = self.agents.generate(
-                input_ids,
-                attention_mask=attn_mask,
-                do_sample=True,
-                top_k=50,
-                temperature=0.5,
-                max_new_tokens=self.max_new_tokens,
-                eos_token_id=self.tokenizer.eos_token_id,
-                pad_token_id=self.tokenizer.pad_token_id,
-                return_dict_in_generate=True,
-            )
-            sequences = output.sequences
+            if self.use_vllm:
+                sequences_text = self.inference_engine.generate(prompts_with_profile)
+                sequences = []
+                for idx, text in enumerate(sequences_text):
+                    gen_ids = self.tokenizer(text, return_tensors="pt").input_ids[0].cuda()
+                    seq = torch.cat([input_ids[idx], gen_ids])
+                    sequences.append(seq)
+                sequences = torch.stack(sequences)
+            else:
+                self.agent_model.set_adapter(self.profiles[agent_idx]["role"])
+                output = self.agents.generate(
+                    input_ids,
+                    attention_mask=attn_mask,
+                    do_sample=True,
+                    top_k=50,
+                    temperature=0.5,
+                    max_new_tokens=self.max_new_tokens,
+                    eos_token_id=self.tokenizer.eos_token_id,
+                    pad_token_id=self.tokenizer.pad_token_id,
+                    return_dict_in_generate=True,
+                )
+                sequences = output.sequences
             actions = []
             for i in range(rollout_threads):
                 action_token = sequences[i][input_ids[i].shape[0] :]
@@ -216,7 +242,7 @@ class MAS(ABC):
             input_ids = token_seq["input_ids"].cuda()
             attn_mask = token_seq["attention_mask"].cuda()
 
-            with self.agents.disable_adapter():
+            with self.agent_model.disable_adapter():
                 values = self.critic(input_ids, attention_mask=attn_mask).unsqueeze(-1)
             all_values.append(values)
         all_values = torch.cat(all_values, dim=1)
@@ -246,7 +272,7 @@ class MAS(ABC):
             obs_act_ids = torch.cat([obs_input_ids, action_tokens[:, agent_idx]], dim=-1)
             obs_act_mask = torch.cat([obs_attn_mask, act_attn_mask], dim=-1)
 
-            with self.agents.disable_adapter():
+            with self.agent_model.disable_adapter():
                 values = self.critic(obs_act_ids, attention_mask=obs_act_mask)
             token_values = self.get_slice(values, obs_full_lengths, act_real_lengths)
             all_values.append(token_values)
@@ -289,10 +315,10 @@ class MAS(ABC):
             if batch_infer:
                 pass
             else:
-                with self.agents.disable_adapter():
+                with self.agent_model.disable_adapter():
                     rho_outputs = self.agents(input_ids=obs_act_ids, attention_mask=obs_act_mask)
                     rho_logits.append(self.get_slice(rho_outputs.logits, obs_full_lengths, act_real_lengths))
-                self.agents.set_adapter(self.profiles[agent_idx]["role"])
+                self.agent_model.set_adapter(self.profiles[agent_idx]["role"])
                 pi_outputs = self.agents(input_ids=obs_act_ids, attention_mask=obs_act_mask)
                 pi_logits.append(self.get_slice(pi_outputs.logits, obs_full_lengths, act_real_lengths))
         rho_logits = torch.cat(rho_logits, dim=1)
@@ -420,7 +446,7 @@ class MAS(ABC):
         attn_mask = token_seq["attention_mask"].cuda()
 
         # values
-        with self.agents.disable_adapter():
+        with self.agent_model.disable_adapter():
             values = self.critic(input_ids, attention_mask=attn_mask)[:, -1]
         return values
 
@@ -457,3 +483,26 @@ class MAS(ABC):
     def eval(self):
         self.agents.eval()
         self.critic.eval()
+
+    @torch.no_grad()
+    def collect_actions(self, obs: np.ndarray):
+        """Collect trajectories without computing logits or values."""
+        rollout_obs, rollout_actions, rollout_action_tokens = self.get_actions_sequential(obs)
+        rollout_action_tokens = rollout_action_tokens.int().cpu().numpy()
+        return rollout_obs, rollout_actions, rollout_action_tokens
+
+    @torch.no_grad()
+    def compute_training_signals(self, obs: np.ndarray, action_tokens: torch.Tensor):
+        """Compute values and log probabilities for training."""
+        if self.algo == "APPO":
+            values = self.get_action_values(obs)
+            log_probs, _ = self.get_joint_action_log_probs(obs, action_tokens, batch_infer=False)
+            return values.float().cpu().numpy(), log_probs.float().cpu().numpy()
+        elif self.algo == "TPPO":
+            values = self.get_token_values(obs, action_tokens).squeeze(-1)
+            logits, _ = self.get_token_logits(obs, action_tokens)
+            logp_softmax = torch.log_softmax(logits, dim=-1)
+            token_log_probs = torch.gather(logp_softmax, -1, action_tokens.unsqueeze(-1)).squeeze(-1)
+            return values.float().cpu().numpy(), token_log_probs.float().cpu().numpy()
+        else:
+            raise NotImplementedError

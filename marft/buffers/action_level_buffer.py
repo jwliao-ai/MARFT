@@ -16,16 +16,18 @@ class ActionBuffer(BaseBuffer):
         self.action_level_advantages = np.zeros_like(self.action_level_returns)
         self.action_level_log_probs = np.zeros_like(self.action_level_returns)
 
-    def insert(self, next_obs, actions, rollout_obs, value_preds, rewards, masks, action_tokens, log_probs):
+    def insert(self, next_obs, actions, rollout_obs, rewards, masks, action_tokens):
         self.obs[self.cur_batch_index, self.step + 1] = next_obs.copy()
         self.actions[self.cur_batch_index, self.step] = actions.copy()
         self.rollout_obs[self.cur_batch_index, self.step] = rollout_obs.copy()
         self.rewards[self.cur_batch_index, self.step] = rewards.copy()
         self.masks[self.cur_batch_index, self.step + 1] = masks.copy()
         self.action_tokens[self.cur_batch_index, self.step] = action_tokens.copy()
-        self.action_level_v_values[self.cur_batch_index, self.step] = value_preds.copy()
-        self.action_level_log_probs[self.cur_batch_index, self.step] = log_probs.copy()
         self.step = (self.step + 1) % self.episode_length
+
+    def update_step(self, step_idx, values, log_probs):
+        self.action_level_v_values[self.cur_batch_index, step_idx] = values.copy()
+        self.action_level_log_probs[self.cur_batch_index, step_idx] = log_probs.copy()
 
     def after_update(self):
         """Copy last timestep data to first index. Called after update to model."""

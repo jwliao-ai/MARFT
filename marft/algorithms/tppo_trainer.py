@@ -33,7 +33,7 @@ class TPPOTrainer(ABC):
 
         self.policy_optimizer = {}
         for agent_idx in range(self.num_agent):
-            self.mas.agents.set_adapter(self.mas.profiles[agent_idx]["role"])
+            self.mas.agent_model.set_adapter(self.mas.profiles[agent_idx]["role"])
             self.policy_optimizer[self.mas.profiles[agent_idx]["role"]] = torch.optim.AdamW(filter(lambda p: p.requires_grad, self.mas.agents.parameters()), lr=self.lr, eps=1e-5, weight_decay=0)
         self.critic_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.mas.critic.parameters()), lr=self.critic_lr, eps=1e-5)
         
@@ -164,13 +164,13 @@ class TPPOTrainer(ABC):
             return value_loss, critic_grad_norm, 0, 0, total_approx_kl, total_entropy
         
         if agent_to_train is not None:
-            self.mas.agents.set_adapter(self.mas.profiles[agent_to_train]['role'])
+            self.mas.agent_model.set_adapter(self.mas.profiles[agent_to_train]['role'])
             policy_grad_norm = nn.utils.clip_grad_norm_(self.mas.agents.parameters(), self.max_grad_norm)
             self.policy_optimizer[self.mas.profiles[agent_to_train]['role']].step()
             total_policy_grad_norm = policy_grad_norm.item()
         else:
             for profile in self.mas.profiles:
-                self.mas.agents.set_adapter(profile['role'])
+                self.mas.agent_model.set_adapter(profile['role'])
                 policy_grad_norm = nn.utils.clip_grad_norm_(self.mas.agents.parameters(), self.max_grad_norm)
                 self.policy_optimizer[profile['role']].step()
                 total_policy_grad_norm += policy_grad_norm.item()

@@ -24,17 +24,15 @@ class BaseBuffer(ABC):
         self.masks = np.ones((self.max_batch, self.episode_length + 1, self.n_rollout_threads, self.num_agents), dtype=np.float32)
 
     @abstractmethod
-    def insert(self, next_obs, actions, rollout_obs, value_preds, rewards, masks, action_tokens, log_probs):
+    def insert(self, next_obs, actions, rollout_obs, rewards, masks, action_tokens):
         """
         Insert data into the buffer.
         :param next_obs: (np.ndarray) next observation
         :param actions: (np.ndarray) actions taken
         :param rollout_obs: (np.ndarray) rollout observations
-        :param value_preds: (np.ndarray) value predictions
         :param rewards: (np.ndarray) rewards received
         :param masks: (np.ndarray) masks for the observations
         :param action_tokens: (np.ndarray) action tokens
-        :param log_probs: (np.ndarray) log probabilities of the actions/tokens
         """
         pass
 
