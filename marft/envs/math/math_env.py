@@ -82,7 +82,7 @@ class MathEnv:
 
         next_obs = np.array([self.current_state for _ in range(self.n_agents)], dtype=np.object_)
         rewards = [0 if idx != self.n_agents - 1 else score for idx in range(self.n_agents)]
-        infos = {"state": self.current_state, "episodic_return": score}
+        infos = {"state": self.current_state, "gt": self.label, "episodic_return": score}
         return next_obs, rewards, dones, infos
 
     def state_transition(self, actions):

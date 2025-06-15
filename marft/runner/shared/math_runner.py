@@ -18,7 +18,6 @@ class MathRunner:
         self.log_interval = self.all_args.log_interval
         self.eval_interval = self.all_args.eval_interval
         self.algo = self.all_args.algorithm_name
-
         self.envs = config["envs"]
         self.eval_envs = config["eval_envs"]
 
@@ -76,11 +75,9 @@ class MathRunner:
                         episodic_return = infos[i]['episodic_return']
                         self.writter.add_scalar("episodic_return", episodic_return, global_step)
 
-            torch.cuda.empty_cache()
             self.before_update()
             train_infos = self.trainer.train(self.buffer, total_num_steps)
             self.buffer.after_update()
-            torch.cuda.empty_cache()
 
             # post process
             # save model

@@ -1,7 +1,6 @@
 absl_py
 cloudpickle
 fairscale
-faiss_gpu
 json_repair
 peft
 pydantic

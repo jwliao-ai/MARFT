@@ -11,6 +11,7 @@ from marft.mas import MAS
 
 class TPPOTrainer(ABC):
 
+
     def __init__(self, args, mas: MAS):
         self.mas = mas
         self.num_agent = mas.num_agents
@@ -32,14 +33,18 @@ class TPPOTrainer(ABC):
         self.gradient_cp_steps = args.gradient_cp_steps
 
         self.policy_optimizer = {}
-        for agent_idx in range(self.num_agent):
-            self.mas.agents.set_adapter(self.mas.profiles[agent_idx]["role"])
-            self.policy_optimizer[self.mas.profiles[agent_idx]["role"]] = torch.optim.AdamW(filter(lambda p: p.requires_grad, self.mas.agents.parameters()), lr=self.lr, eps=1e-5, weight_decay=0)
+        for agent in self.mas.agents:
+            self.policy_optimizer[agent.role] = torch.optim.AdamW(
+                filter(lambda p: p.requires_grad, agent.parameters()),
+                lr=self.lr,
+                eps=1e-5,
+                weight_decay=0,
+            )
         self.critic_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.mas.critic.parameters()), lr=self.critic_lr, eps=1e-5)
         
         if args.load_path is not None:
             self.load_optimizers(os.path.join(args.load_path, "optimizers.pt"), map_location="cpu")
-            
+ 
     def cal_token_mask(self, action_tokens_batch):
         pad_token = self.mas.tokenizer.pad_token_id
         token_mask = (action_tokens_batch != pad_token).int()
@@ -162,17 +167,16 @@ class TPPOTrainer(ABC):
             # torch.cuda.empty_cache()
         if total_approx_kl > 1.7e-6: # adjust to the real situation
             return value_loss, critic_grad_norm, 0, 0, total_approx_kl, total_entropy
-        
+
         if agent_to_train is not None:
-            self.mas.agents.set_adapter(self.mas.profiles[agent_to_train]['role'])
-            policy_grad_norm = nn.utils.clip_grad_norm_(self.mas.agents.parameters(), self.max_grad_norm)
-            self.policy_optimizer[self.mas.profiles[agent_to_train]['role']].step()
+            agent = self.mas.agents[agent_to_train]
+            policy_grad_norm = nn.utils.clip_grad_norm_(agent.parameters(), self.max_grad_norm)
+            self.policy_optimizer[agent.role].step()
             total_policy_grad_norm = policy_grad_norm.item()
         else:
-            for profile in self.mas.profiles:
-                self.mas.agents.set_adapter(profile['role'])
-                policy_grad_norm = nn.utils.clip_grad_norm_(self.mas.agents.parameters(), self.max_grad_norm)
-                self.policy_optimizer[profile['role']].step()
+            for agent in self.mas.agents:
+                policy_grad_norm = nn.utils.clip_grad_norm_(agent.parameters(), self.max_grad_norm)
+                self.policy_optimizer[agent.role].step()
                 total_policy_grad_norm += policy_grad_norm.item()
 
         return value_loss, critic_grad_norm, policy_loss, policy_grad_norm, total_approx_kl, total_entropy
@@ -226,7 +230,7 @@ class TPPOTrainer(ABC):
             },
             os.path.join(exp_path, f"optimizers.pt"),
         )
-        print(f"[TPPOTrainer] optimizer states saved → {exp_path}")
+        print(f"[TPPOTrainer] optimizer states saved -> {exp_path}")
 
     def load_optimizers(self, path: str, map_location: str | torch.device = "cpu"):
         ckpt = torch.load(path, map_location=map_location)
@@ -234,10 +238,14 @@ class TPPOTrainer(ABC):
             # The trainer’s __init__ already created the corresponding optimizer.
             self.policy_optimizer[role].load_state_dict(opt_state)
         self.critic_optimizer.load_state_dict(ckpt["critic_opt_state"])
-        print(f"[TPPOTrainer] optimizer states loaded ← {path}")
+        print(f"[TPPOTrainer] optimizer states loaded <- {path}")
 
     def prep_training(self):
-        self.mas.train()
+        for agent in self.mas.agents:
+            agent.train()
+        self.mas.critic.train()
 
     def prep_rollout(self):
-        self.mas.eval()
+        for agent in self.mas.agents:
+            agent.eval()
+        self.mas.critic.eval()

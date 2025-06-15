@@ -31,13 +31,28 @@ class APPOTrainer(ABC):
         self.gradient_cp_steps = args.gradient_cp_steps
 
         self.policy_optimizer = {}
-        for agent_idx in range(self.num_agent):
-            self.mas.agents.set_adapter(self.mas.profiles[agent_idx]["role"])
-            self.policy_optimizer[self.mas.profiles[agent_idx]["role"]] = torch.optim.AdamW(filter(lambda p: p.requires_grad, self.mas.agents.parameters()), lr=self.lr, eps=1e-5, weight_decay=0)
+        for agent in self.mas.agents:
+            self.policy_optimizer[agent.role] = torch.optim.AdamW(
+                filter(lambda p: p.requires_grad, agent.parameters()),
+                lr=self.lr,
+                eps=1e-5,
+                weight_decay=0,
+            )
         self.critic_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.mas.critic.parameters()), lr=self.critic_lr, eps=1e-5)
         
         if args.load_path is not None:
             self.load_optimizers(os.path.join(args.load_path, "optimizers.pt"), map_location="cpu")
+
+    def cal_policy_loss(self, log_prob_infer: torch.Tensor, log_prob_batch: torch.Tensor, advantages_batch: torch.Tensor, entropy: torch.Tensor):
+
+        log_ratio = log_prob_infer - log_prob_batch
+        imp_weights = torch.exp(log_ratio)
+        approx_kl = ((imp_weights - 1) - log_ratio).mean()
+        surr1 = -torch.clamp(imp_weights, 1.0 - self.clip_param, 1.0 + self.clip_param) * advantages_batch
+        surr2 = -imp_weights * advantages_batch
+        surr = torch.max(surr1, surr2)
+        policy_loss = surr.mean() - self.entropy_coef * entropy.mean()
+        return policy_loss, approx_kl
 
     def cal_policy_loss(self, log_prob_infer: torch.Tensor, log_prob_batch: torch.Tensor, advantages_batch: torch.Tensor, entropy: torch.Tensor):
 
@@ -90,7 +105,6 @@ class APPOTrainer(ABC):
             cp_batch_size = 1
 
         # critic update with checkpoint gradient accumulation
-        torch.cuda.empty_cache()
         self.critic_optimizer.zero_grad()
         value_loss = 0
         for start in range(0, batch_size, cp_batch_size):
@@ -105,7 +119,6 @@ class APPOTrainer(ABC):
             cp_value_loss *= cp_weight  # Scale the loss by the chunk weight
             cp_value_loss.backward()
             value_loss += cp_value_loss.item()
-            torch.cuda.empty_cache()
         # Gradient clipping
         if self._use_max_grad_norm:
             critic_grad_norm = nn.utils.clip_grad_norm_(self.mas.critic.parameters(), self.max_grad_norm)
@@ -118,7 +131,6 @@ class APPOTrainer(ABC):
             return value_loss, critic_grad_norm, 0, 0, 0, 0
         
         # policy update
-        torch.cuda.empty_cache()
         for optimizer in self.policy_optimizer.values(): optimizer.zero_grad()
         total_approx_kl = 0.
         total_entropy = 0.
@@ -145,15 +157,14 @@ class APPOTrainer(ABC):
             return value_loss, critic_grad_norm, 0, 0, total_approx_kl, total_entropy
 
         if agent_to_train is not None:
-            self.mas.agents.set_adapter(self.mas.profiles[agent_to_train]['role'])
-            policy_grad_norm = nn.utils.clip_grad_norm_(self.mas.agents.parameters(), self.max_grad_norm)
-            self.policy_optimizer[self.mas.profiles[agent_to_train]['role']].step()
+            agent = self.mas.agents[agent_to_train]
+            policy_grad_norm = nn.utils.clip_grad_norm_(agent.parameters(), self.max_grad_norm)
+            self.policy_optimizer[agent.role].step()
             total_policy_grad_norm = policy_grad_norm.item()
         else:
-            for profile in self.mas.profiles:
-                self.mas.agents.set_adapter(profile['role'])
-                policy_grad_norm = nn.utils.clip_grad_norm_(self.mas.agents.parameters(), self.max_grad_norm)
-                self.policy_optimizer[profile['role']].step()
+            for agent in self.mas.agents:
+                policy_grad_norm = nn.utils.clip_grad_norm_(agent.parameters(), self.max_grad_norm)
+                self.policy_optimizer[agent.role].step()
                 total_policy_grad_norm += policy_grad_norm.item()
 
         return value_loss, critic_grad_norm, policy_loss, total_policy_grad_norm, total_approx_kl, total_entropy
@@ -205,7 +216,7 @@ class APPOTrainer(ABC):
             },
             os.path.join(exp_path, f"optimizers.pt"),
         )
-        print(f"[APPOTrainer] optimizer states saved → {exp_path}")
+        print(f"[APPOTrainer] optimizer states saved -> {exp_path}")
 
     def load_optimizers(self, path: str, map_location: str | torch.device = "cpu"):
         ckpt = torch.load(path, map_location=map_location)
@@ -213,12 +224,14 @@ class APPOTrainer(ABC):
             # The trainer’s __init__ already created the corresponding optimizer.
             self.policy_optimizer[role].load_state_dict(opt_state)
         self.critic_optimizer.load_state_dict(ckpt["critic_opt_state"])
-        print(f"[APPOTrainer] optimizer states loaded ← {path}")
+        print(f"[APPOTrainer] optimizer states loaded <- {path}")
 
     def prep_training(self):
-        self.mas.agents().train()
-        self.mas.critic().train()
+        for agent in self.mas.agents:
+            agent.train()
+        self.mas.critic.train()
 
     def prep_rollout(self):
-        self.mas.agents().eval()
-        self.mas.critic().eval()
+        for agent in self.mas.agents:
+            agent.eval()
+        self.mas.critic.eval()
