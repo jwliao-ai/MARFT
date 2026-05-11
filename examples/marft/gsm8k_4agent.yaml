@@ -1,0 +1,263 @@
+experiment_name: gsm8k-4agent
+trial_name: trial1
+
+seed: 1
+enable_offload: false
+total_train_epochs: 50
+tokenizer_path: ${actor.path}
+
+multi_agent:
+  graph_type: sequential
+  use_multi_lora: true
+  shared_lora: true
+  lora_name_prefix: agent
+  role_names:
+    - planner
+    - solver
+    - reflector
+    - verifier
+  role_configs:
+    planner:
+      name: planner
+      system_prompt: >
+        You are a math problem planner. Given a math problem, break it
+        down into clear, numbered steps. Do NOT solve the problem — only
+        produce the solution plan.
+      description: Breaks the problem into a step-by-step plan.
+    solver:
+      name: solver
+      system_prompt: >
+        You are a math solver. Follow the plan provided in the
+        conversation and solve the problem step by step.
+        Put your final numeric answer inside \boxed{}.
+      description: Executes the plan and produces a candidate answer.
+    reflector:
+      name: reflector
+      system_prompt: >
+        You are a math reflector. Review the solution provided in the
+        conversation. Check each step for correctness and identify any
+        errors or improvements. Provide your analysis.
+      description: Reflects on the solution and identifies errors.
+    verifier:
+      name: verifier
+      system_prompt: >
+        You are a math verifier. Based on the solution and reflection,
+        produce the final answer. If the answer is correct, restate it
+        inside \boxed{}. If it is wrong, provide the corrected answer
+        inside \boxed{}.
+      description: Produces the final verified answer.
+  credit_strategy: equal
+  credit_discount: 1.0
+  reward_sharing: true
+  independent_critic: null
+  shared_policy: true
+  enable_thinking: false
+  dump_transcripts: true
+
+cluster:
+  n_nodes: 1
+  n_gpus_per_node: 4
+  fileroot: /workspace/experiments
+  name_resolve:
+    type: nfs
+    nfs_record_root: /workspace/experiments/name_resolve
+
+allocation_mode: sglang:d2p1t1+d2p1t1
+
+scheduler:
+  type: null
+
+rollout:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  max_concurrent_rollouts: 32
+  queue_size: null
+  consumer_batch_size: ${train_dataset.batch_size}
+  max_head_offpolicyness: 2
+  enable_rollout_tracing: false
+  scheduling_spec: ${actor.scheduling_spec}
+  fileroot: ${cluster.fileroot}
+  tokenizer_path: ${tokenizer_path}
+  dump_to_file: true
+  use_lora: true
+
+gconfig:
+  n_samples: 1
+  min_new_tokens: 0
+  max_new_tokens: 6144
+  greedy: false
+  temperature: 1.0
+  lora_name: default
+
+eval_gconfig:
+  n_samples: 1
+  min_new_tokens: 0
+  max_new_tokens: 6144
+  greedy: false
+  temperature: 0.6
+
+actor:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  path: /workspace/models/Qwen2.5-1.5B-Instruct
+  init_from_scratch: false
+  disable_dropout: true
+  gradient_checkpointing: true
+  dtype: bfloat16
+  weight_update_mode: disk
+  mb_spec:
+    max_tokens_per_mb: 32768
+  optimizer:
+    type: adam
+    lr: 1.0e-6
+    weight_decay: 0.01
+    beta1: 0.9
+    beta2: 0.999
+    eps: 1e-8
+    lr_scheduler_type: constant
+    gradient_clipping: 1.0
+    warmup_steps_proportion: 0.001
+  eps_clip: 0.2
+  temperature: ${gconfig.temperature}
+  reward_scaling: 1.0
+  reward_bias: 0.0
+  kl_ctl: 0.01
+  kl_estimator: k3
+  reward_sharing: ${multi_agent.reward_sharing}
+  ppo_n_minibatches: 8
+  recompute_logprob: true
+  use_decoupled_loss: true
+  behav_imp_weight_cap: 5.0
+  reward_norm:
+    mean_level: batch
+    std_level: batch
+    group_size: ${gconfig.n_samples}
+  adv_norm:
+    mean_level: batch
+    std_level: batch
+  max_new_tokens: ${gconfig.max_new_tokens}
+  use_lora: true
+  peft_type: lora
+  lora_rank: 32
+  lora_alpha: 16
+  target_modules: [all-linear]
+  scheduling_spec:
+    - task_type: worker
+      port_count: 2
+      gpu: 1
+      mem: 32
+      cmd: python3 -m areal.infra.rpc.rpc_server
+      env_vars: {}
+
+ref:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  path: ${actor.path}
+  init_from_scratch: false
+  disable_dropout: true
+  dtype: ${actor.dtype}
+  mb_spec:
+    max_tokens_per_mb: 32768
+  optimizer: null
+  scheduling_strategy:
+    type: colocation
+    target: actor
+  scheduling_spec: ${actor.scheduling_spec}
+
+critic:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  path: ${actor.path}
+  is_critic: true
+  init_from_scratch: false
+  disable_dropout: true
+  gradient_checkpointing: true
+  dtype: ${actor.dtype}
+  mb_spec:
+    max_tokens_per_mb: 32768
+  optimizer:
+    type: adam
+    lr: 1.0e-6
+    weight_decay: 0.01
+    gradient_clipping: 1.0
+  ppo_n_minibatches: 8
+  use_lora: true
+  peft_type: ${actor.peft_type}
+  lora_rank: ${actor.lora_rank}
+  lora_alpha: ${actor.lora_alpha}
+  target_modules: ${actor.target_modules}
+  scheduling_strategy:
+    type: colocation
+    target: actor
+  scheduling_spec: ${actor.scheduling_spec}
+
+sglang:
+  model_path: ${actor.path}
+  random_seed: ${seed}
+  skip_tokenizer_init: true
+  dtype: ${actor.dtype}
+  max_running_requests: null
+  context_length: 24576
+  mem_fraction_static: 0.8
+  enable_lora: ${actor.use_lora}
+  max_lora_rank: ${actor.lora_rank}
+  lora_target_modules: ${actor.target_modules}
+  schedule_policy: fcfs
+  max_loaded_loras: 5
+  max_loras_per_batch: 4
+
+train_dataset:
+  batch_size: 128
+  shuffle: true
+  pin_memory: true
+  num_workers: 4
+  path: /workspace/data/gsm8k
+  type: rl
+  max_length: 1024
+
+valid_dataset:
+  batch_size: 64
+  pin_memory: true
+  num_workers: 4
+  path: /workspace/data/gsm8k
+  type: rl
+
+saver:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  freq_epochs: null
+  freq_steps: 50
+  freq_secs: null
+
+recover:
+  mode: disabled
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  freq_epochs: 1
+
+evaluator:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  freq_epochs: null
+  freq_steps: 50
+  freq_secs: null
+
+stats_logger:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  wandb:
+    mode: disabled
+  tensorboard:
+    path: "/workspace/experiments/tensorboard/${experiment_name}/${trial_name}"
+
+perf_tracer:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  enabled: false
+  session_tracer:
+    enabled: false
