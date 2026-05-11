@@ -1,3 +1,6 @@
+# Copyright 2025 Junwei Liao, Shanghai Jiao Tong University and Shanghai Innovation Institute.
+# Licensed under the Apache License, Version 2.0.
+
 """Multi-agent reward functions for code generation workflows.
 
 Provides:

@@ -2,15 +2,15 @@
 set -e
 
 echo "=== Ruff lint ==="
-ruff check areal/workflow/multi_agent/ areal/reward/multi_agent.py areal/tests/test_multi_agent.py examples/multi_agent_math/ --fix || true
+ruff check areal/workflow/multi_agent/ areal/reward/multi_agent.py areal/tests/test_multi_agent.py examples/marft/ --fix || true
 
 echo ""
 echo "=== Ruff format ==="
-ruff format areal/workflow/multi_agent/ areal/reward/multi_agent.py areal/tests/test_multi_agent.py examples/multi_agent_math/
+ruff format areal/workflow/multi_agent/ areal/reward/multi_agent.py areal/tests/test_multi_agent.py examples/marft/
 
 echo ""
 echo "=== Ruff lint (re-check) ==="
-ruff check areal/workflow/multi_agent/ areal/reward/multi_agent.py areal/tests/test_multi_agent.py examples/multi_agent_math/
+ruff check areal/workflow/multi_agent/ areal/reward/multi_agent.py areal/tests/test_multi_agent.py examples/marft/
 
 echo ""
 echo "=== Import sanity check ==="

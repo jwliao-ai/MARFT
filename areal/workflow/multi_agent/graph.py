@@ -1,3 +1,6 @@
+# Copyright 2025 Junwei Liao, Shanghai Jiao Tong University and Shanghai Innovation Institute.
+# Licensed under the Apache License, Version 2.0.
+
 from __future__ import annotations
 
 from collections import defaultdict, deque

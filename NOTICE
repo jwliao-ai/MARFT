@@ -1,0 +1,19 @@
+MARFT (Multi-Agent Reinforcement Fine-Tuning)
+Copyright 2025 Junwei Liao, Shanghai Jiao Tong University and Shanghai Innovation Institute.
+
+MARFT-specific code (written by the authors above):
+  areal/workflow/multi_agent/
+  areal/reward/multi_agent.py, multi_agent_code.py
+  areal/tests/test_multi_agent.py
+  examples/marft/
+
+This project is built upon AReaL v0.5.3
+(https://github.com/inclusionAI/AReaL), which is licensed under the
+Apache License, Version 2.0.
+
+Original AReaL copyright:
+  Copyright 2025 Ant Group Inc.
+  Copyright 2024 Wei Fu & Zhiyu Mei
+
+Portions of areal/utils/data.py are derived from work by Tri Dao:
+  Copyright (c) 2023, Tri Dao.

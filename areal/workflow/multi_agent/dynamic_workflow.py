@@ -1,3 +1,6 @@
+# Copyright 2025 Junwei Liao, Shanghai Jiao Tong University and Shanghai Innovation Institute.
+# Licensed under the Apache License, Version 2.0.
+
 """Dynamic multi-agent workflow driven by an LLM orchestrator.
 
 Instead of following a fixed DAG, an orchestrator agent decides which

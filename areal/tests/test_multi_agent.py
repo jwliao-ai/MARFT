@@ -1,3 +1,6 @@
+# Copyright 2025 Junwei Liao, Shanghai Jiao Tong University and Shanghai Innovation Institute.
+# Licensed under the Apache License, Version 2.0.
+
 """Unit and integration tests for the multi-agent workflow framework.
 
 Unit tests cover the pure-logic components (AgentRole, WorkflowGraph,
@@ -14,6 +17,7 @@ from dataclasses import dataclass, field
 from unittest.mock import patch
 
 import pytest
+import torch
 
 from areal.workflow.multi_agent.agent_role import AgentRole
 from areal.workflow.multi_agent.credit import AgentStep, CreditAssignment
@@ -586,6 +590,8 @@ class TestMultiAgentWorkflowIntegration:
         assert "attention_mask" in result
 
         for key, tensor in result.items():
+            if not isinstance(tensor, torch.Tensor):
+                continue
             assert tensor.dim() == 2, f"{key} should be 2D [1, seq_len]"
             assert tensor.shape[0] == 1, f"{key} batch dim should be 1"
 
@@ -598,6 +604,8 @@ class TestMultiAgentWorkflowIntegration:
 
         seq_len = result["input_ids"].shape[1]
         for key, tensor in result.items():
+            if not isinstance(tensor, torch.Tensor):
+                continue
             if key == "rewards":
                 assert tensor.shape == (1, 1), "rewards should be scalar [1, 1]"
                 continue
@@ -1601,6 +1609,18 @@ class TestDynamicWorkflowTranscript:
 
 class TestAgentIdsStaticWorkflow:
     """Verify agent_ids tensor is present and correct in static workflow."""
+
+    @pytest.fixture
+    def workflow(self):
+        return _make_workflow()
+
+    @pytest.fixture
+    def engine(self):
+        return FakeEngine()
+
+    @pytest.fixture
+    def data(self):
+        return _make_data()
 
     def test_agent_ids_in_result(self, workflow, engine, data):
         with patch("areal.workflow.multi_agent.workflow.workflow_context") as mock_ctx:

@@ -3,25 +3,27 @@ requires = ["uv_build>=0.9.18,<0.10.0"]
 build-backend = "uv_build"
 
 [project]
-name = "areal"
-description = "AReaL: A Large-Scale Asynchronous Reinforcement Learning System"
+name = "marft"
+description = "MARFT: Multi-Agent Reinforcement Fine-Tuning"
 readme = "README.md"
 license = {text = "Apache-2.0"}
 requires-python = ">=3.12,<3.13"
 version = "0.1.0"
 authors = [
-    {name = "AReaL Team"},
+    {name = "Junwei Liao", email = "jwliao.ai@sjtu.edu.cn"},
 ]
 maintainers = [
-    {name = "AReaL Team"},
+    {name = "Junwei Liao", email = "jwliao.ai@sjtu.edu.cn"},
 ]
 keywords = [
-    "distributed-systems",
+    "multi-agent",
     "reinforcement-learning",
+    "fine-tuning",
     "large-language-models",
     "llm-training",
     "llm-agent",
     "agentic-rl",
+    "marft",
 ]
 classifiers = [
     #   3 - Alpha
@@ -152,22 +154,23 @@ megatron = [
 ]
 # Convenience extra for all CUDA packages (requires Linux x86_64 with CUDA)
 cuda = [
-    "areal[vllm]",
-    "areal[sglang]",
-    "areal[tms]",
-    "areal[megatron]",
-    "areal[flash-attn]",
+    "marft[vllm]",
+    "marft[sglang]",
+    "marft[tms]",
+    "marft[megatron]",
+    "marft[flash-attn]",
 ]
 # 'all' extra - kept for compatibility, CUDA packages skipped on non-Linux via markers
 all = [
-    "areal[cuda]",
+    "marft[cuda]",
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/inclusionAI/AReaL"
-"Repository" = "https://github.com/inclusionAI/AReaL"
+"Homepage" = "https://github.com/SII-MARFT/MARFT"
+"Repository" = "https://github.com/SII-MARFT/MARFT"
 "Documentation" = "https://inclusionai.github.io/AReaL/intro.html"
-"Bug Tracker" = "https://github.com/inclusionAI/AReaL/issues"
+"Bug Tracker" = "https://github.com/SII-MARFT/MARFT/issues"
+"Upstream AReaL" = "https://github.com/inclusionAI/AReaL"
 
 [dependency-groups]
 dev = [

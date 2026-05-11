@@ -1,3 +1,6 @@
+# Copyright 2025 Junwei Liao, Shanghai Jiao Tong University and Shanghai Innovation Institute.
+# Licensed under the Apache License, Version 2.0.
+
 """Orchestrator output parsing and prompt construction.
 
 The orchestrator is an LLM agent that decides which specialist to invoke

@@ -1,5 +1,7 @@
 # Copyright 2025 Ant Group Inc.
 # Copyright 2024 Wei Fu & Zhiyu Mei
+# Modifications copyright 2025 Junwei Liao, Shanghai Jiao Tong University
+# and Shanghai Innovation Institute.
 # Licensed under the Apache License, Version 2.0 (the "License").
 
 # This file standardizes the name-resolve names used by different components of the system.
