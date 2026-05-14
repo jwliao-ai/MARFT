@@ -206,4 +206,4 @@ sympy/
 !/docs/figures/*
 
 *experiments*/
-tensorboard/
+tensorboard/uv.lock
